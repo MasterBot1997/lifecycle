@@ -106,7 +106,7 @@ def get_cloud_move_tickets(date_from: str, date_to: str) -> list:
             AND j.new_value = 'Cloud:Вторая линия'
         WHERE t.created_at >= %s AND t.created_at < %s
         GROUP BY t.id, t.created_at
-        HAVING count_move > 1
+        HAVING count_move >= 1
         ORDER BY t.created_at
     """
     return run_mysql_query(DB_HELPDESK, sql, (date_from, date_to)) or []
