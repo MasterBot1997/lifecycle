@@ -6,6 +6,7 @@ SPREADSHEET_ID = "1V1nrBJLsVefUEKj6HXEgimywoBIvGINnplu1f9p4luI"
 SHEET_GID = 640640423
 CLOUD_STATS_GID = 1877381753
 CLOUD_MOVES_GID = 1373632618
+ALL_GID = 2050386850
 
 SERVICE_ACCOUNT_JSON = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -157,3 +158,61 @@ def write_cloud_moves(rows: list, period_label: str) -> int:
     ws.update(f"A3:D{2 + len(values)}", values, value_input_option="USER_ENTERED")
     print(f"Записано {len(values)} строк за {period_label} (gid={CLOUD_MOVES_GID}).")
     return len(values)
+
+
+_ALL_HEADERS = [
+    "ticket_id",
+    "start_at",
+    "end_at",
+    "время_жизни_сек",
+    "ожидание_ответа_саппорта_сек",
+    "ожидание_ответа_клиента_сек",
+    "время_жизни_мин",
+    "ожидание_ответа_саппорта_мин",
+    "ожидание_ответа_клиента_мин",
+    "число_итераций",
+    "count_move",
+    "count_manual_move",
+    "lifecycle",
+]
+
+_ALL_FORMULA_COLS = {
+    "время_жизни_мин":              "время_жизни_сек",
+    "ожидание_ответа_саппорта_мин": "ожидание_ответа_саппорта_сек",
+    "ожидание_ответа_клиента_мин":  "ожидание_ответа_клиента_сек",
+}
+
+
+def write_all(rows: list, period_label: str) -> int:
+    """Lifecycle + count_move + count_manual_move → GID 2050386850.
+
+    Перезаписывает лист полностью (строка 1 — заголовки, данные с A2).
+    """
+    gc = gspread.service_account(filename=SERVICE_ACCOUNT_JSON)
+    ws = gc.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(ALL_GID)
+
+    col_letter_map = {h: _col_letter(i + 1) for i, h in enumerate(_ALL_HEADERS)}
+    last_col = _col_letter(len(_ALL_HEADERS))
+
+    ws.update("A1", [_ALL_HEADERS])
+    ws.batch_clear([f"A2:{last_col}"])
+
+    if not rows:
+        print("Нет данных для записи.")
+        return 0
+
+    data = []
+    for i, row in enumerate(rows):
+        sheet_row = i + 2
+        data_row = []
+        for h in _ALL_HEADERS:
+            if h in _ALL_FORMULA_COLS:
+                sec_col = _ALL_FORMULA_COLS[h]
+                data_row.append(f"={col_letter_map[sec_col]}{sheet_row}/60")
+            else:
+                data_row.append(_fmt(row.get(h, "")))
+        data.append(data_row)
+
+    ws.update("A2", data, value_input_option="USER_ENTERED")
+    print(f"Записано {len(data)} строк за {period_label} (gid={ALL_GID}).")
+    return len(data)

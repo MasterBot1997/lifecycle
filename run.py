@@ -18,13 +18,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gsheet import write_cloud_moves, write_cloud_stats, write_to_sheet
+from gsheet import write_all, write_cloud_moves, write_cloud_stats, write_to_sheet
 from lifecycle import collect_lifecycles
 from queries import (
     get_closed_tickets,
     get_cloud_move_tickets,
     get_cloud_ticket_stats,
     get_journal_for_tickets,
+    get_move_counts_for_tickets,
 )
 
 
@@ -78,6 +79,35 @@ def run_lifecycle(args):
         write_to_sheet(rows, period_label)
 
 
+def run_all(args):
+    print(f"Сбор lifecycle + передачи за {args.date_from} — {args.date_to}, тег: '{args.tag}' ...")
+    tickets = get_closed_tickets(args.date_from, args.date_to, tag=args.tag)
+
+    if not tickets:
+        print("Тикетов не найдено.")
+        sys.exit(0)
+
+    print(f"Найдено тикетов: {len(tickets)}. Загружаем journal и передачи ...")
+    ticket_ids = [int(t["id"]) for t in tickets]
+
+    events = get_journal_for_tickets(ticket_ids)
+    move_counts = get_move_counts_for_tickets(ticket_ids)
+
+    move_map = {int(r["ticket_id"]): r for r in move_counts}
+
+    rows = collect_lifecycles(tickets, events)
+    for row in rows:
+        mc = move_map.get(int(row["ticket_id"]), {})
+        row["count_move"] = int(mc.get("count_move") or 0)
+        row["count_manual_move"] = int(mc.get("count_manual_move") or 0)
+
+    print(f"Итого тикетов: {len(rows)}")
+
+    if not args.no_sheet:
+        period_label = f"{args.date_from} — {args.date_to}"
+        write_all(rows, period_label)
+
+
 def run_cloud_stats(args):
     print(f"Сбор cloud-статистики за [{args.date_from}, {args.date_to}) ...")
     rows = get_cloud_ticket_stats(args.date_from, args.date_to)
@@ -108,6 +138,7 @@ TASKS = {
     "lifecycle": run_lifecycle,
     "cloud-stats": run_cloud_stats,
     "cloud-moves": run_cloud_moves,
+    "all": run_all,
 }
 
 

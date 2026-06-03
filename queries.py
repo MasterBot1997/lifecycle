@@ -65,6 +65,32 @@ def get_journal_for_tickets(ticket_ids: list) -> list:
     return result
 
 
+def get_move_counts_for_tickets(ticket_ids: list) -> list:
+    """Кол-во передач на Cloud:Вторая линия на тикет: всего и вручную (не autorouting)."""
+    if not ticket_ids:
+        return []
+    result = []
+    for chunk in _chunks(ticket_ids, CHUNK_SIZE):
+        sql = f"""
+            SELECT
+                t.id AS ticket_id,
+                COUNT(j.id) AS count_move,
+                COUNT(j.id) - SUM(CASE
+                    WHEN j.author = 'VM support' AND j.employee_id = 716
+                    THEN 1 ELSE 0
+                END) AS count_manual_move
+            FROM ticket t
+            LEFT JOIN journal j
+                ON j.ticket_id = t.id
+                AND j.property = 'move'
+                AND j.new_value = 'Cloud:Вторая линия'
+            WHERE t.id IN ({_ph(chunk)})
+            GROUP BY t.id
+        """
+        result.extend(run_mysql_query(DB_HELPDESK, sql, tuple(chunk)) or [])
+    return result
+
+
 def get_cloud_ticket_stats(date_from: str, date_to: str) -> list:
     """Кол-во cloud-тикетов и перемещений на Вторую линию, сгруппированных по месяцам."""
     sql = """
