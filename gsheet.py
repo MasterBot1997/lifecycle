@@ -171,9 +171,9 @@ _ALL_HEADERS = [
     "ожидание_ответа_саппорта_мин",
     "ожидание_ответа_клиента_мин",
     "число_итераций",
-    "count_move",
-    "count_manual_move",
-    "lifecycle",
+    "кол_во_передач",
+    "кол_во_передач_вручную",
+    "lifecycle_history",
 ]
 
 _ALL_FORMULA_COLS = {

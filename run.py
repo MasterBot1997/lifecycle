@@ -98,8 +98,9 @@ def run_all(args):
     rows = collect_lifecycles(tickets, events)
     for row in rows:
         mc = move_map.get(int(row["ticket_id"]), {})
-        row["count_move"] = int(mc.get("count_move") or 0)
-        row["count_manual_move"] = int(mc.get("count_manual_move") or 0)
+        row["кол_во_передач"] = int(mc.get("count_move") or 0)
+        row["кол_во_передач_вручную"] = int(mc.get("count_manual_move") or 0)
+        row["lifecycle_history"] = row.pop("lifecycle")
         row["ticket_id"] = f"https://hp.beget.ru/ticket/{row['ticket_id']}"
 
     print(f"Итого тикетов: {len(rows)}")
