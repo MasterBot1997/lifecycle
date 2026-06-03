@@ -26,6 +26,7 @@ from queries import (
     get_cloud_ticket_stats,
     get_journal_for_tickets,
     get_move_counts_for_tickets,
+    get_post_counts_for_tickets,
 )
 
 
@@ -87,21 +88,27 @@ def run_all(args):
         print("Тикетов не найдено.")
         sys.exit(0)
 
-    print(f"Найдено тикетов: {len(tickets)}. Загружаем journal и передачи ...")
+    print(f"Найдено тикетов: {len(tickets)}. Загружаем journal, передачи и посты ...")
     ticket_ids = [int(t["id"]) for t in tickets]
 
     events = get_journal_for_tickets(ticket_ids)
     move_counts = get_move_counts_for_tickets(ticket_ids)
+    post_counts = get_post_counts_for_tickets(ticket_ids)
 
     move_map = {int(r["ticket_id"]): r for r in move_counts}
+    post_map = {int(r["ticket_id"]): r for r in post_counts}
 
     rows = collect_lifecycles(tickets, events)
     for row in rows:
-        mc = move_map.get(int(row["ticket_id"]), {})
+        tid = int(row["ticket_id"])
+        mc = move_map.get(tid, {})
+        pc = post_map.get(tid, {})
+        row["число_постов_пользователя"] = int(pc.get("число_постов_пользователя") or 0)
+        row["число_постов_саппорта"] = int(pc.get("число_постов_саппорта") or 0)
         row["кол_во_передач"] = int(mc.get("count_move") or 0)
         row["кол_во_передач_вручную"] = int(mc.get("count_manual_move") or 0)
         row["lifecycle_history"] = row.pop("lifecycle")
-        row["ticket_id"] = f"https://hp.beget.ru/ticket/{row['ticket_id']}"
+        row["ticket_id"] = f"https://hp.beget.ru/ticket/{tid}"
 
     print(f"Итого тикетов: {len(rows)}")
 

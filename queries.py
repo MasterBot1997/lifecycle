@@ -92,6 +92,25 @@ def get_move_counts_for_tickets(ticket_ids: list) -> list:
     return result
 
 
+def get_post_counts_for_tickets(ticket_ids: list) -> list:
+    """Кол-во постов пользователя и саппорта на тикет."""
+    if not ticket_ids:
+        return []
+    result = []
+    for chunk in _chunks(ticket_ids, CHUNK_SIZE):
+        sql = f"""
+            SELECT
+                ticket_id,
+                SUM(CASE WHEN employee_id IS NULL THEN 1 ELSE 0 END) AS число_постов_пользователя,
+                SUM(CASE WHEN employee_id IS NOT NULL THEN 1 ELSE 0 END) AS число_постов_саппорта
+            FROM post
+            WHERE ticket_id IN ({_ph(chunk)})
+            GROUP BY ticket_id
+        """
+        result.extend(run_mysql_query(DB_HELPDESK, sql, tuple(chunk)) or [])
+    return result
+
+
 def get_cloud_ticket_stats(date_from: str, date_to: str) -> list:
     """Кол-во cloud-тикетов и перемещений на Вторую линию, сгруппированных по месяцам."""
     sql = """
