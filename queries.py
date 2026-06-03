@@ -76,7 +76,8 @@ def get_move_counts_for_tickets(ticket_ids: list) -> list:
                 t.id AS ticket_id,
                 COUNT(j.id) AS count_move,
                 COUNT(j.id) - SUM(CASE
-                    WHEN j.author = 'VM support' AND j.employee_id = 716
+                    WHEN (j.author = 'VM support' AND j.employee_id = 716)
+                      OR (j.author = 'Сотрудник Для-Скрипта-Клюкова А.Е.' AND j.employee_id = 842)
                     THEN 1 ELSE 0
                 END) AS count_manual_move
             FROM ticket t
