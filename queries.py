@@ -69,7 +69,7 @@ def get_cloud_ticket_stats(date_from: str, date_to: str) -> list:
     """Кол-во cloud-тикетов и перемещений на Вторую линию, сгруппированных по месяцам."""
     sql = """
         SELECT
-            DATE_FORMAT(t.created_at, '%Y-%m') AS month,
+            DATE_FORMAT(t.created_at, '%%Y-%%m') AS month,
             COUNT(DISTINCT p.ticket_id) AS count_ticket,
             COUNT(DISTINCT CASE WHEN j.ticket_id IS NOT NULL THEN p.ticket_id END) AS count_move
         FROM ticket t
@@ -80,7 +80,7 @@ def get_cloud_ticket_stats(date_from: str, date_to: str) -> list:
             AND j.property = 'move'
             AND j.new_value = 'Cloud:Вторая линия'
         WHERE t.created_at >= %s AND t.created_at < %s
-        GROUP BY DATE_FORMAT(t.created_at, '%Y-%m')
+        GROUP BY DATE_FORMAT(t.created_at, '%%Y-%%m')
         ORDER BY month
     """
     return run_mysql_query(DB_HELPDESK, sql, (date_from, date_to)) or []
