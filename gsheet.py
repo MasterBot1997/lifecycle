@@ -188,36 +188,84 @@ _ALL_FORMULA_COLS = {
 }
 
 
-def write_all(rows: list, period_label: str) -> int:
-    """Lifecycle + count_move + count_manual_move → GID 2050386850.
+def _coerce_for_compare(val) -> str:
+    """Приводит значение к строке для сравнения с тем, что вернул Sheets."""
+    if val is None:
+        return ""
+    s = str(val).strip()
+    try:
+        f = float(s)
+        return str(int(f)) if f == int(f) else s
+    except (ValueError, TypeError):
+        return s
 
-    Перезаписывает лист полностью (строка 1 — заголовки, данные с A2).
+
+def write_all(rows: list, period_label: str) -> int:
+    """Upsert lifecycle-строк в GID 2050386850.
+
+    - Если тикет уже есть и данные не изменились → пропускаем.
+    - Если тикет уже есть и что-то изменилось → обновляем строку.
+    - Если тикета нет → добавляем в первую пустую строку.
     """
     gc = gspread.service_account(filename=SERVICE_ACCOUNT_JSON)
-    ws = gc.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(ALL_GID)
+    sh = gc.open_by_key(SPREADSHEET_ID)
+    ws = sh.get_worksheet_by_id(ALL_GID)
 
+    ws.update("A1", [_ALL_HEADERS])
+
+    all_values = ws.get_all_values()  # строка 0 = заголовки
+
+    ticket_col_idx = _ALL_HEADERS.index("ticket_id")
+    existing_map = {}
+    for i, row in enumerate(all_values[1:], start=2):
+        if len(row) > ticket_col_idx and row[ticket_col_idx]:
+            existing_map[row[ticket_col_idx].strip()] = i
+
+    next_row = max(len(all_values) + 1, 2)
     col_letter_map = {h: _col_letter(i + 1) for i, h in enumerate(_ALL_HEADERS)}
     last_col = _col_letter(len(_ALL_HEADERS))
 
-    ws.update("A1", [_ALL_HEADERS])
-    ws.batch_clear([f"A2:{last_col}"])
+    added = updated = skipped = 0
+    batch_data = []
 
-    if not rows:
-        print("Нет данных для записи.")
-        return 0
+    for row_data in rows:
+        ticket_id = str(row_data.get("ticket_id", "")).strip()
 
-    data = []
-    for i, row in enumerate(rows):
-        sheet_row = i + 2
-        data_row = []
-        for h in _ALL_HEADERS:
-            if h in _ALL_FORMULA_COLS:
-                sec_col = _ALL_FORMULA_COLS[h]
-                data_row.append(f"={col_letter_map[sec_col]}{sheet_row}/60")
-            else:
-                data_row.append(_fmt(row.get(h, "")))
-        data.append(data_row)
+        if ticket_id in existing_map:
+            sheet_row = existing_map[ticket_id]
+            existing_row = all_values[sheet_row - 1] if sheet_row - 1 < len(all_values) else []
 
-    ws.update("A2", data, value_input_option="USER_ENTERED")
-    print(f"Записано {len(data)} строк за {period_label} (gid={ALL_GID}).")
-    return len(data)
+            changed = any(
+                _coerce_for_compare(_fmt(row_data.get(h, ""))) != _coerce_for_compare(
+                    existing_row[i] if i < len(existing_row) else ""
+                )
+                for i, h in enumerate(_ALL_HEADERS)
+                if h not in _ALL_FORMULA_COLS
+            )
+
+            if not changed:
+                skipped += 1
+                continue
+            updated += 1
+        else:
+            sheet_row = next_row
+            existing_map[ticket_id] = sheet_row
+            next_row += 1
+            added += 1
+
+        row_values = [
+            f"={col_letter_map[_ALL_FORMULA_COLS[h]]}{sheet_row}/60"
+            if h in _ALL_FORMULA_COLS
+            else _fmt(row_data.get(h, ""))
+            for h in _ALL_HEADERS
+        ]
+        batch_data.append({
+            "range": f"{ws.title}!A{sheet_row}:{last_col}{sheet_row}",
+            "values": [row_values],
+        })
+
+    if batch_data:
+        sh.values_batch_update({"valueInputOption": "USER_ENTERED", "data": batch_data})
+
+    print(f"[{period_label}] Добавлено: {added}, обновлено: {updated}, без изменений: {skipped} (gid={ALL_GID}).")
+    return added + updated
