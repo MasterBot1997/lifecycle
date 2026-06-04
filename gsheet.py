@@ -265,6 +265,9 @@ def write_all(rows: list, period_label: str) -> int:
         })
 
     if batch_data:
+        last_row_needed = next_row - 1
+        if last_row_needed > ws.row_count:
+            ws.add_rows(last_row_needed - ws.row_count + 1000)
         sh.values_batch_update({"valueInputOption": "USER_ENTERED", "data": batch_data})
 
     print(f"[{period_label}] Добавлено: {added}, обновлено: {updated}, без изменений: {skipped} (gid={ALL_GID}).")
