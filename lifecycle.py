@@ -213,6 +213,7 @@ def build_lifecycle(ticket: dict, events: list) -> dict:
     ожидание_ответа_клиента_сек = _calc_support_wait_sec(evts_all)
     ожидание_ответа_саппорта_сек = max(0, время_жизни_сек - ожидание_ответа_клиента_сек)
     число_итераций = _calc_iterations(evts_all)
+    время_работы_сек = sum(ph["duration_sec"] for ph in phases if ph["type"] == "working")
 
     return {
         "ticket_id": ticket_id,
@@ -221,6 +222,7 @@ def build_lifecycle(ticket: dict, events: list) -> dict:
         "время_жизни_сек": время_жизни_сек,
         "ожидание_ответа_саппорта_сек": ожидание_ответа_саппорта_сек,
         "ожидание_ответа_клиента_сек": ожидание_ответа_клиента_сек,
+        "время_работы_сек": время_работы_сек,
         "число_итераций": число_итераций,
         "lifecycle": lifecycle_str,
         "phases": phases,
